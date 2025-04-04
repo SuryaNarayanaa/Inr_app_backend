@@ -1,0 +1,10 @@
+fastapi
+pymongo
+jinja2
+pydantic
+fastapi_sessions
+uvicorn
+pytz
+python-multipart
+aiofiles
+email-validator
