@@ -188,6 +188,40 @@ async def create_item(item: Item, current_user: dict = Depends(role_required("ad
     collection.insert_one(item_data)
     return {"message": "Item created successfully"}
 
+@app.post("/patient/create", dependencies=[Depends(get_current_user)])
+async def create_patient(
+    patient: PatientCreate,
+    current_user: dict = Depends(role_required(["admin", "caretaker"]))
+):
+    patient_data = patient.dict()
+    patient_data["passHash"] = hashlib.sha512(
+        patient.contact.replace(" ", "").replace("+91", "").encode()
+    ).hexdigest()
+    
+    collection.insert_one(patient_data)
+    return {"message": "Patient created successfully"}
+
+@app.post("/doctor/create", dependencies=[Depends(get_current_user)])
+async def create_doctor(doctor: DoctorCreate,current_user: dict = Depends(role_required(["admin"]))):  
+    if collection.find_one({"ID": doctor.ID}):
+        raise HTTPException(400, "Doctor ID already exists")
+
+    hashed_password = hashlib.sha512(doctor.password.encode('utf-8')).hexdigest()
+
+    doctor_data = doctor.dict()
+    doctor_data.update({
+        "passHash": hashed_password,
+        "type": "Doctor" 
+    })
+    doctor_data.pop("password") 
+
+    result = collection.insert_one(doctor_data)
+    
+    return {
+        "message": "Doctor created successfully",
+        "doctor_id": str(result.inserted_id)
+    }
+
 @app.post("/item/update/{item_id}", dependencies=[Depends(get_current_user)])
 async def update_item(item_id: str, item: Item, current_user: dict = Depends(role_required("admin"))):
     item_data = json.loads(item.item)

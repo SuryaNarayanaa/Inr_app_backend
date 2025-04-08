@@ -1,5 +1,5 @@
-from typing import List, Dict
-from pydantic import BaseModel, Field, validator
+from typing import List, Dict, Optional
+from pydantic import BaseModel, Field, validator,constr
 from datetime import date, datetime
 
 class SessionData(BaseModel):
@@ -7,6 +7,20 @@ class SessionData(BaseModel):
 
 class Item(BaseModel):
     item: str
+
+class PatientCreate(BaseModel):
+    ID: str  # Should contain "PAT" prefix
+    fullName: str
+    contact: str
+    caretaker: Optional[str] = None  # Caretaker ID if exists
+    type: str = "Patient"
+
+class DoctorCreate(BaseModel):
+    ID: constr(strip_whitespace=True, min_length=4, pattern=r'^DOC')  # Enforce DOC prefix
+    fullName: str
+    contact: str
+    password: str  # Raw password to be hashed
+    type: str = "Doctor"  # Auto-set for consistency
 
 class MedicalHistory(BaseModel):
     diagnosis: str
