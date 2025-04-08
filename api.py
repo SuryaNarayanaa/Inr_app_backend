@@ -92,10 +92,6 @@ async def login(username: str = Form(...), password: str = Form(...)):
     if username == "admin" and password == "admin123":
         user_data = {"name": username, "role": "admin", "ID": username}
         token = create_access_token(user_data)
-        refresh_token = create_refresh_token()
-        hashed_refresh = hashlib.sha512(refresh_token.encode()).hexdigest()
-        collection.update_one()
-
         return JSONResponse(
             status_code=200,
             content={"message": "login successful", "role": "admin", "access_token": token})
