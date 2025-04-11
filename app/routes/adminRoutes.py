@@ -1,6 +1,6 @@
 from fastapi import APIRouter,Depends,Request
 from fastapi.responses import JSONResponse
-from app.controllers.adminController import get_doctor_by_id, get_patient_by_id, getadmindetails,create_patient,create_doctor,patient_modify,doctor_modify
+from app.controllers.adminController import delete_doctor_by_id, delete_patient_by_id, get_doctor_by_id, get_patient_by_id, getadmindetails,create_patient,create_doctor,patient_modify,doctor_modify
 from app.utils.authutils import get_current_user, role_required
 
 admin_router = APIRouter()
@@ -16,9 +16,7 @@ async def get_admin_details(current_user: dict = Depends(get_current_user)):
 async def add_patient(request: Request, current_user: dict = Depends(get_current_user)):
     try:
         patient_data = await request.json()
-        print(patient_data)
         result = await create_patient(patient_data)
-        return JSONResponse(status_code=201, content={"message": "Patient added successfully", "patient_id": result})
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
     
@@ -66,3 +64,18 @@ async def get_doctor(doctor_id: str, current_user: dict = Depends(get_current_us
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
     
+@admin_router.delete("/delete_patient/{patient_id}", response_class=JSONResponse, dependencies=[Depends(role_required("admin"))])
+async def delete_patient(patient_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        result = await delete_patient_by_id(patient_id, current_user)
+        return JSONResponse(status_code=200, content=result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@admin_router.delete("/delete_doctor/{doctor_id}", response_class=JSONResponse, dependencies=[Depends(role_required("admin"))])
+async def delete_doctor(doctor_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        result = await delete_doctor_by_id(doctor_id, current_user)
+        return JSONResponse(status_code=200, content=result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
