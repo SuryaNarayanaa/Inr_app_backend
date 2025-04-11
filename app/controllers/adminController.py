@@ -55,12 +55,12 @@ async def create_patient(patient: Union[PatientCreate, dict], current_user: dict
         raise HTTPException(status_code=400, detail="Patient already exists")
     
     cleaned_contact = patient_data["contact"].replace(" ", "").replace("+91", "")
-    print(cleaned_contact)
+    # Removed debugging print statement to avoid logging sensitive information
     patient_data["passHash"] = hashlib.sha512(cleaned_contact.encode()).hexdigest()
     
     result = await patient_collection.insert_one(patient_data)
 
-    print(patient_data)
+    # print(patient_data)
     
     return {"message": "Patient created successfully", "patient": str(result.inserted_id)}
 
@@ -130,3 +130,47 @@ async def patient_modify(patient_id: str, patient_data: dict, current_user: dict
         raise HTTPException(status_code=400, detail="No changes were made to the patient")
 
     return {"message": "Patient updated successfully", "patient_id": patient_id}
+
+
+async def get_patient_by_id(patient_id: str, current_user: dict = Depends(role_required(["admin"]))):
+    patient = await patient_collection.find_one({"ID": patient_id})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    patient["_id"] = str(patient["_id"])
+    return patient
+
+
+async def get_doctor_by_id(doctor_id: str, current_user: dict = Depends(role_required(["admin"]))):
+    doctor = await doctor_collection.find_one({"ID": doctor_id})
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    doctor["_id"] = str(doctor["_id"])
+    return doctor
+
+
+async def delete_patient_by_id(patient_id: str, current_user: dict = Depends(role_required(["admin"]))):
+    existing_patient = await patient_collection.find_one({"ID": patient_id})
+    if not existing_patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    result = await patient_collection.delete_one({"ID": patient_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to delete patient")
+
+    return {"message": "Patient deleted successfully", "patient_id": patient_id}
+
+
+async def delete_doctor_by_id(doctor_id: str, current_user: dict = Depends(role_required(["admin"]))):
+    existing_doctor = await doctor_collection.find_one({"ID": doctor_id})
+    if not existing_doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    result = await doctor_collection.delete_one({"ID": doctor_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to delete doctor")
+
+    return {"message": "Doctor deleted successfully", "doctor_id": doctor_id}
