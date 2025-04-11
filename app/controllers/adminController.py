@@ -50,7 +50,7 @@ async def create_patient(patient: Union[PatientCreate, dict], current_user: dict
     else:
         patient_data = patient.dict(by_alias=True)
     
-    existing_patient = await patient_collection.find_one({"name": patient_data["name"]})
+    existing_patient = await patient_collection.find_one({"ID": patient_data["ID"]})
     if existing_patient:
         raise HTTPException(status_code=400, detail="Patient already exists")
     
@@ -111,7 +111,7 @@ async def doctor_modify(doctor_id: str, doctor_data: dict, current_user: dict = 
 
 
 async def patient_modify(patient_id: str, patient_data: dict, current_user: dict = Depends(role_required(["admin"]))):
-    existing_patient = await patient_collection.find_one({"name": patient_id})
+    existing_patient = await patient_collection.find_one({"ID": patient_id})
     if not existing_patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
@@ -122,7 +122,7 @@ async def patient_modify(patient_id: str, patient_data: dict, current_user: dict
 
     # Update the patient document
     result = await patient_collection.update_one(
-        {"name": patient_id},
+        {"ID": patient_id},
         {"$set": patient_data}
     )
 

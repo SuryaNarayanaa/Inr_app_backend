@@ -41,7 +41,7 @@ async def modify_doctor(doctor_id: str, request: Request, current_user: dict = D
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@admin_router.put("/modify_patient/{patient_id}", response_class=JSONResponse, dependencies=[Depends(role_required(["admin", "caretaker"]))])
+@admin_router.put("/modify_patient/{patient_id}", response_class=JSONResponse, dependencies=[Depends(role_required("admin"))])
 async def modify_patient(patient_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         patient_data = await request.json()

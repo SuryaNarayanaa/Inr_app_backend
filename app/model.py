@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field, constr, validator
 from datetime import date, datetime
 from bson import ObjectId
 
@@ -20,7 +20,8 @@ class PyObjectId(ObjectId):
         field_schema.update(type="string")
 
 class PatientCreate(BaseModel):
-    name: str = Field(..., pattern=r'^PAT', min_length=4, strip_whitespace=True)  # Should contain "PAT" prefix
+    ID: str = Field(..., pattern=r'^PAT', min_length=4, strip_whitespace=True)
+    name:str
     contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
     age: int = Field(..., ge=1, le=120)
     gender: str = Field(..., pattern="^(M|F|O)$")
@@ -59,6 +60,7 @@ class DosageSchedule(BaseModel):
 class Patient(BaseModel):
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
     name: str = Field(...)
+    ID : str
     age: int = Field(..., ge=1, le=120)
     gender: str = Field(..., pattern="^(M|F|O)$")
     target_inr_min: float
@@ -71,6 +73,18 @@ class Patient(BaseModel):
     kin_name: str = Field(..., pattern="^[a-zA-Z ]{2,}$")
     kin_contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
     refresh_token: Optional[str] = None  # Refresh token for JWT
+    doctor : str
+    caretaker: str
+
+    @validator("therapy_start_date", pre=True)
+    def parse_therapy_start_date(cls, value):
+        if isinstance(value, str):
+            try:
+                # Parse using the day/month/year format
+                return datetime.strptime(value, "%d/%m/%Y").date()
+            except ValueError:
+                raise ValueError("therapy_start_date must be in dd/mm/YYYY format")
+        return value
 
     def as_dict(self) -> Dict:
         dct = self.dict(by_alias=True)
@@ -85,6 +99,7 @@ class Doctor(BaseModel):
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
     fullName: str
     ID: str
+    PFP:str
     contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
     refresh_token: Optional[str] = None  # Refresh token for JWT
 

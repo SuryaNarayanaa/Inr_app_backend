@@ -12,7 +12,6 @@ async def login(username: str = Form(...), password: str = Form(...)):
         user_data = {"name": username, "role": "admin", "ID": username}
         access_token = create_access_token(user_data)
         refresh_token = create_refresh_token()
-        # (Optionally you may want to store the refresh token for admin as well)
         return JSONResponse(
             status_code=200,
             content={
@@ -34,12 +33,10 @@ async def login(username: str = Form(...), password: str = Form(...)):
             
             access_token = create_access_token(user2)
             refresh_token = create_refresh_token()
-            # Store the refresh token in the doctor document
             await doctor_collection.update_one(
                 {"_id": user["_id"]},
                 {"$set": {"refresh_token": refresh_token}}
             )
-            
             return JSONResponse(
                 status_code=200,
                 content={
@@ -52,18 +49,18 @@ async def login(username: str = Form(...), password: str = Form(...)):
         else:
             raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    elif "PAT" in username:
+    elif "PAT" in username:    #  review after 
         pipeline = [
-            {"$match": {"name": username}},
+            {"$match": {"ID": username}},
             {
                 "$lookup": {
-                    "from": "items",
+                    "from": "doctors",
                     "localField": "caretaker",
                     "foreignField": "ID",
                     "as": "caretaker_info"
                 }
             },
-            {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},  
+            {"$unwind": "$caretaker_info"},  
             {"$addFields": {"caretakerName": "$caretaker_info.fullName"}}
         ]
         cursor = patient_collection.aggregate(pipeline)
@@ -71,61 +68,31 @@ async def login(username: str = Form(...), password: str = Form(...)):
         
         if len(patient) == 0:
             user = await patient_collection.find_one({
-                "name": username,
+                "ID": username,
                 "caretaker": {"$exists": False}
             })
-            if user and password == user["contact"].replace(" ", "").replace("+91", ""):
-                user2 = user.copy()
-                if "_id" in user2:
-                    user2["_id"] = str(user2["_id"])
-                user2.update({"role": "patient"})
+            print(user)
+        if user and password == user["contact"].replace(" ", "").replace("+91", ""):
+            user2 = user.copy()
+            if "_id" in user2:
+                user2["_id"] = str(user2["_id"])
+            user2.update({"role": "patient"})
+            print(user2)
+            access_token = create_access_token({"role":user2["role"], "ID": user2["ID"]})
+            refresh_token = create_refresh_token()
+            await patient_collection.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"refresh_token": refresh_token}}
+            )
                 
-                access_token = create_access_token(user2)
-                refresh_token = create_refresh_token()
-                # Store the refresh token in the patient document
-                await patient_collection.update_one(
-                    {"_id": user["_id"]},
-                    {"$set": {"refresh_token": refresh_token}}
-                )
-                
-                return JSONResponse(
-                    status_code=200,
-                    content={
-                        "message": "login successful",
-                        "role": "patient",
+            return JSONResponse(
+                status_code=200,
+                content={ "message": "login successful","role": "patient",
                         "access_token": access_token,
-                        "refresh_token": refresh_token
-                    }
+                        "refresh_token": refresh_token }
                 )
-            else:
-                raise HTTPException(status_code=401, detail="Invalid credentials")
         else:
-            user = patient[0]
-            if password == user["contact"].replace(" ", "").replace("+91", ""):
-                user2 = user.copy()
-                if "_id" in user2:
-                    user2["_id"] = str(user2["_id"])
-                user2.update({"role": "patient"})
-                
-                access_token = create_access_token(user2)
-                refresh_token = create_refresh_token()
-                # Store the refresh token in the patient document
-                await patient_collection.update_one(
-                    {"_id": user["_id"]},
-                    {"$set": {"refresh_token": refresh_token}}
-                )
-                
-                return JSONResponse(
-                    status_code=200,
-                    content={
-                        "message": "login successful",
-                        "role": "patient",
-                        "access_token": access_token,
-                        "refresh_token": refresh_token
-                    }
-                )
-            else:
-                raise HTTPException(status_code=401, detail="Invalid credentials")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -133,6 +100,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
 async def logout(current_user: dict = Depends(get_current_user)):
     role = current_user.get("role")
     user_id = current_user.get("ID")
+    print(user_id)
     if not user_id:
         raise HTTPException(status_code=401, detail="User ID not found.")
     if role == "doctor":
