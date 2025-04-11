@@ -1,6 +1,6 @@
 from fastapi import APIRouter,Depends,Request
 from fastapi.responses import JSONResponse
-from app.controllers.adminController import getadmindetails,create_patient,create_doctor,patient_modify,doctor_modify
+from app.controllers.adminController import get_doctor_by_id, get_patient_by_id, getadmindetails,create_patient,create_doctor,patient_modify,doctor_modify
 from app.utils.authutils import get_current_user, role_required
 
 admin_router = APIRouter()
@@ -49,3 +49,20 @@ async def modify_patient(patient_id: str, request: Request, current_user: dict =
         return JSONResponse(status_code=200, content=result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
+    
+@admin_router.get("/get_patient/{patient_id}", response_class=JSONResponse, dependencies=[Depends(role_required("admin"))])
+async def get_patient(patient_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        result = await get_patient_by_id(patient_id, current_user)
+        return JSONResponse(status_code=200, content=result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+    
+@admin_router.get("/get_doctor/{doctor_id}", response_class=JSONResponse, dependencies=[Depends(role_required("admin"))])
+async def get_doctor(doctor_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        result = await get_doctor_by_id(doctor_id, current_user)
+        return JSONResponse(status_code=200, content=result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+    

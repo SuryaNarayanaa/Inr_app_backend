@@ -130,3 +130,21 @@ async def patient_modify(patient_id: str, patient_data: dict, current_user: dict
         raise HTTPException(status_code=400, detail="No changes were made to the patient")
 
     return {"message": "Patient updated successfully", "patient_id": patient_id}
+
+
+async def get_patient_by_id(patient_id: str, current_user: dict = Depends(role_required(["admin"]))):
+    patient = await patient_collection.find_one({"ID": patient_id})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    patient["_id"] = str(patient["_id"])
+    return patient
+
+
+async def get_doctor_by_id(doctor_id: str, current_user: dict = Depends(role_required(["admin"]))):
+    doctor = await doctor_collection.find_one({"ID": doctor_id})
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    doctor["_id"] = str(doctor["_id"])
+    return doctor
