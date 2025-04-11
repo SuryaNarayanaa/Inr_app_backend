@@ -4,6 +4,7 @@ from app.utils.authutils import get_current_user, role_required
 from app.database import patient_collection, doctor_collection
 from app.model import PatientCreate, DoctorCreate 
 import hashlib
+import re
 from typing import Union
 
 async def getadmindetails(request: Request, current_user: dict = Depends(role_required("admin"))):
@@ -44,25 +45,42 @@ async def getadmindetails(request: Request, current_user: dict = Depends(role_re
     )
 
 
-async def create_patient(patient: Union[PatientCreate, dict], current_user: dict = Depends(role_required(["admin"]))):
-    if isinstance(patient, dict):
-        patient_data = patient
-    else:
-        patient_data = patient.dict(by_alias=True)
+async def create_patient(patient:PatientCreate, current_user: dict = Depends(role_required(["admin"]))):
     
-    existing_patient = await patient_collection.find_one({"ID": patient_data["ID"]})
+    patient_data = patient if isinstance(patient, dict) else patient.dict()
+    
+    existing_patient = await patient_collection.find_one({"contact": patient_data["contact"]})
     if existing_patient:
         raise HTTPException(status_code=400, detail="Patient already exists")
     
+    if "caretaker" in patient_data:
+        caretaker = await doctor_collection.find_one({"ID": patient_data["caretaker"]})
+        if not caretaker:
+            raise HTTPException(status_code=400, detail="Caretaker does not exist")
+
+    latest_patient = await patient_collection.find_one(
+        {"ID": {"$regex": "^PAT\\d+$"}},
+        sort=[("ID", -1)]
+    )
+
+    if latest_patient:
+        match = re.search(r"PAT(\d+)", latest_patient["ID"])
+        new_suffix = int(match.group(1)) + 1 if match else 1
+    else:
+        new_suffix = 1
+
+    patient_id = f"PAT{new_suffix:05d}"
+    patient_data["ID"] = patient_id
+
+    print(patient_data)
+    
     cleaned_contact = patient_data["contact"].replace(" ", "").replace("+91", "")
-    # Removed debugging print statement to avoid logging sensitive information
     patient_data["passHash"] = hashlib.sha512(cleaned_contact.encode()).hexdigest()
     
     result = await patient_collection.insert_one(patient_data)
-
-    # print(patient_data)
-    
-    return {"message": "Patient created successfully", "patient": str(result.inserted_id)}
+    print(result)
+    return JSONResponse (status_code=200,
+        content={"message": "Patient created successfully","patient_id":patient_id})
 
 async def create_doctor(
     doctor: DoctorCreate,
@@ -138,6 +156,7 @@ async def get_patient_by_id(patient_id: str, current_user: dict = Depends(role_r
         raise HTTPException(status_code=404, detail="Patient not found")
 
     patient["_id"] = str(patient["_id"])
+    patient.pop("passHash", None)
     return patient
 
 
@@ -147,6 +166,7 @@ async def get_doctor_by_id(doctor_id: str, current_user: dict = Depends(role_req
         raise HTTPException(status_code=404, detail="Doctor not found")
 
     doctor["_id"] = str(doctor["_id"])
+    doctor.pop("passHash", None)
     return doctor
 
 

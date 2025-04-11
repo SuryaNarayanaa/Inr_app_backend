@@ -15,8 +15,8 @@ async def get_admin_details(current_user: dict = Depends(get_current_user)):
 @admin_router.post("/add_patient",response_class=JSONResponse, dependencies=[Depends(role_required("admin"))])
 async def add_patient(request: Request, current_user: dict = Depends(get_current_user)):
     try:
-        patient_data = await request.json()
-        result = await create_patient(patient_data)
+        patient_data = await request.json()  #TODO : validate The contact number according to field type
+        return await create_patient(patient_data)
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
     
