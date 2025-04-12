@@ -19,38 +19,6 @@ class PyObjectId(ObjectId):
     def __get_pydantic_json_schema__(cls, field_schema):
         field_schema.update(type="string")
 
-class PatientCreate(BaseModel):
-    name:str
-    contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
-    age: int = Field(..., ge=1, le=120)
-    gender: str = Field(..., pattern="^(M|F|O)$")
-    caretaker: Optional[str] = None
-    type: str = "Patient"
-    
-    @field_validator("contact")
-    @classmethod
-    def validate_contact(cls, v):
-        if not v.startswith("+91"):
-            raise ValueError("Contact number must start with +91")
-        if len(v) != 13 or not v[3:].isdigit():
-            raise ValueError("Contact number must be 10 digits long after +91")
-        return v
-    class Config:
-        json_encoders = {ObjectId: str}
-        allow_population_by_field_name = True  # Allow using `_id` when interacting with MongoDB
-
-class DoctorCreate(BaseModel):
-    ID: str = Field(..., pattern=r'^DOC', min_length=4, strip_whitespace=True)  # Enforce DOC prefix
-    fullName: str
-    contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
-    password: str  # Raw password to be hashed
-    type: str = "Doctor"  # Auto-set for consistency
-    refresh_token: Optional[str] = None  # Refresh token for JWT
-
-    class Config:
-        allow_population_by_field_name = True
-        json_encoders = {ObjectId: str}
-
 class MedicalHistory(BaseModel):
     diagnosis: str
     duration_value: int
@@ -63,6 +31,45 @@ class DosageSchedule(BaseModel):
     def as_dict(self) -> dict:
         return {"day": self.day, "dosage": self.dosage}
 
+
+class PatientCreate(BaseModel):
+    name:str
+    contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
+    age: int = Field(..., ge=1, le=120)
+    gender: str = Field(..., pattern="^(M|F|O)$")
+    caretaker: Optional[str] = None
+    type: str = "Patient"
+    therapy_start_date : date
+    medical_history: Optional[List[MedicalHistory]]
+    therapy_start_date: date
+    dosage_schedule: Optional[List[DosageSchedule]]
+    
+    @field_validator("contact")
+    @classmethod
+    def validate_contact(cls, v):
+        if not v.startswith("+91"):
+            raise ValueError("Contact number must start with +91")
+        if len(v) != 13 or not v[3:].isdigit():
+            raise ValueError("Contact number must be 10 digits long after +91")
+        return v
+    class Config:
+        json_encoders = {ObjectId: str}
+        populate_by_name = True  # Allow using `_id` when interacting with MongoDB
+
+class DoctorCreate(BaseModel):
+    ID: str = Field(..., pattern=r'^DOC', min_length=4, strip_whitespace=True)  # Enforce DOC prefix
+    fullName: str
+    contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
+    password: str  # Raw password to be hashed
+    type: str = "Doctor"  # Auto-set for consistency
+    refresh_token: Optional[str] = None  # Refresh token for JWT
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+
 class INRReport(BaseModel):
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
     type: str = Field(default="INR Report")
@@ -73,7 +80,7 @@ class INRReport(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     class Config:
-        allow_population_by_field_name = True
+        populate_by_name = True
         json_encoders = {ObjectId: str}
 
 class Patient(BaseModel):
@@ -103,7 +110,7 @@ class Patient(BaseModel):
         return dct
 
     class Config:
-        allow_population_by_field_name = True
+        populate_by_name = True
         json_encoders = {ObjectId: str}
 
 class Doctor(BaseModel):
@@ -115,5 +122,5 @@ class Doctor(BaseModel):
     refresh_token: Optional[str] = None  # Refresh token for JWT
 
     class Config:
-        allow_population_by_field_name = True
+        populate_by_name = True
         json_encoders = {ObjectId: str}
