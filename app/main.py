@@ -36,4 +36,5 @@ app.include_router(doctor_router,prefix='/doctor',tags=['Doctor'])
 app.include_router(patient_router,prefix='/patient',tags=['Patient'])
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=4502, forwarded_allow_ips="*")
+    port = int(os.getenv("PORT", 4502))
+    uvicorn.run(app, host="0.0.0.0", port=port, forwarded_allow_ips="*")

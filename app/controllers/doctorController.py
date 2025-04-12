@@ -10,10 +10,29 @@ import pytz
 import os
 
 async def doctorhome(request:Request,current_user : dict = Depends(role_required("doctor"))):
+    pipeline = [
+        {"$match": {"doctor": current_user["ID"]}},
+        {"$lookup": {
+            "from": "doctor",
+            "localField": "caretaker",
+            "foreignField": "ID",
+            "as": "caretaker_info"
+        }},
+        {"$unwind": "$caretaker_info"},
+        {"$addFields": {"caretakerName": "$caretaker_info.fullName"}},
+        {"$project": {"caretakerName": 1, "name": 1, "doctor": 1, "ID": 1, "age": 1, "gender": 1}}
+    ]
+    patients = await patient_collection.aggregate(pipeline).to_list(length=None)
+    patients2 = await patient_collection.find({"doctor": current_user["ID"], "caretaker": {"$exists": False}}).to_list(length=None)
+    for i in patients2:
+        patients.append(i)
+    for patient in patients:
+        if "_id" in patient:
+            patient["_id"] = str(patient["_id"])
     current_user["_id"] = str(current_user["_id"])
     current_user.pop("passHash",None)
     current_user.pop("refresh_token",None)
-    return JSONResponse(status_code=200, content={"doctor":current_user})
+    return JSONResponse(status_code=200, content={"patients":patients,"user":current_user})
 
 
 async def get_doctors():  # review why this route
