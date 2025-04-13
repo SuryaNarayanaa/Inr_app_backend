@@ -1,7 +1,9 @@
-from fastapi import APIRouter,Depends,Request,HTTPException,File,Form,UploadFile,Query
+from fastapi import APIRouter,Depends,Request,HTTPException,File,Form,UploadFile,Query,Body
 from fastapi.responses import JSONResponse
 from app.utils.authutils import get_current_user,role_required
-from app.controllers.patientController import ( patient_home,update_inr_report,submit_report )
+from app.controllers.patientController import ( patient_home,update_inr_report,
+        patient_reports,submit_report,get_missed_doses,take_dose )
+from app.schema.patientSchema import DoseInput
 
 patient_router = APIRouter()
 
@@ -31,7 +33,7 @@ async def update_inr(request: Request,
 @patient_router.get("/report",response_class=JSONResponse,dependencies=[Depends(get_current_user)])
 async def get_report(request: Request,current_user: dict = Depends(role_required("patient"))):
     try:
-        return await submit_report(request,current_user)
+        return await patient_reports(request,current_user)
     except HTTPException as http_exc:
         return JSONResponse(status_code=http_exc.status_code, content={"error": http_exc.detail})
     except Exception as e:
@@ -50,18 +52,18 @@ async def post_report(request: Request,
         return JSONResponse(status_code=500, content={"error": str(e)})
     
 @patient_router.get("/missedDoses",response_class=JSONResponse,dependencies=[Depends(get_current_user)])
-async def get_missed_doses(request: Request,current_user: dict = Depends(role_required("patient"))):
+async def misses_doses(request: Request,current_user: dict = Depends(role_required("patient"))):
     try:
-        return await submit_report(request,current_user)
+        return await get_missed_doses(request,current_user)
     except HTTPException as http_exc:
         return JSONResponse(status_code=http_exc.status_code, content={"error": http_exc.detail})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-@patient_router.get("/take_dose",response_class=JSONResponse,dependencies=[Depends(get_current_user)])
-async def get_missed_doses(date: str,request: Request,current_user: dict = Depends(role_required("patient"))):
+@patient_router.put("/take_dose",response_class=JSONResponse,dependencies=[Depends(get_current_user)])
+async def put_taken_dose(request: Request, dose_input: DoseInput = Body(...), current_user: dict = Depends(role_required("patient"))):
     try:
-        return await submit_report(date,request,current_user)
+        return await take_dose(request, dose_input.date, current_user)
     except HTTPException as http_exc:
         return JSONResponse(status_code=http_exc.status_code, content={"error": http_exc.detail})
     except Exception as e:

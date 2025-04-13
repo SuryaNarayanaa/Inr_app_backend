@@ -13,6 +13,7 @@ from app.controllers.doctorController import (
     download_patient_report,
 )
 from app.utils.authutils import get_current_user, role_required
+from app.model import PatientCreate
 
 doctor_router = APIRouter()
 
@@ -49,9 +50,9 @@ async def reassign_doctor_route(
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @doctor_router.post("/add-patient",response_class=JSONResponse, dependencies=[Depends(get_current_user)])
-async def add_patient_route(patient_id: str, request: Request, current_user: dict = Depends(role_required("doctor"))):
+async def add_patient_route(patient_data:PatientCreate, request: Request, current_user: dict = Depends(role_required("doctor"))):
     try:
-        return await add_patient(patient_id, request, current_user)
+        return await add_patient(patient_data, request, current_user)
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
     except Exception as e:

@@ -1,17 +1,20 @@
-from fastapi import  Depends, Request, HTTPException,Form,UploadFile,File,Query
+from fastapi import APIRouter, Depends, Request, HTTPException,Form,UploadFile,File,Query,Body
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from app.utils.authutils import get_current_user, role_required
 from app.model import INRReport
 from app.utils.patientUtils import calculate_monthly_inr_average, get_medication_dates, find_missed_doses
 from app.database import patient_collection,doctor_collection
 import os
+from datetime import datetime, timedelta,date
+
 
 async def patient_home(request: Request, current_user: dict = Depends(role_required("patient"))):
     pat = current_user
 
     if not pat.get("inr_reports"):
         pat["inr_reports"] = [{"date": "1900-01-01T00:00", "inr_value": 0}]
-
+    print(pat.get("inr_reports"))
     chart_data = calculate_monthly_inr_average(pat.get("inr_reports"))
 
     therapy_start_date = pat.get("therapy_start_date")
@@ -23,10 +26,11 @@ async def patient_home(request: Request, current_user: dict = Depends(role_requi
     medication_dates = get_medication_dates(therapy_start_date, dosage_schedule)
     missed_doses = find_missed_doses(medication_dates, pat.get("taken_doses"))[-1:-11:-1]
 
+    json_encoded_pat = jsonable_encoder(pat, exclude={"_id": True,"passHash":True,"refresh_token":True})
     return JSONResponse(
         status_code=200,
         content={
-            "patient": pat,
+            "patient": json_encoded_pat,
             "chart_data": chart_data,
             "missed_doses": missed_doses
         }
@@ -61,10 +65,10 @@ async def update_inr_report(request:Request,
 
 async def patient_reports(request:Request, current_user: dict = Depends(role_required("patient"))):
     data = {
-        "lifestyleChanges": current_user.get("lifestyleChanges"),
-        "otherMedication": current_user.get("otherMedication"),
-        "sideEffects": current_user.get("sideEffects"),
-        "prolongedIllness": current_user.get("prolongedIllness")
+        "lifestyleChanges": current_user.get("lifestylechanges"),
+        "otherMedication": current_user.get("othermedication"),
+        "sideEffects": current_user.get("sideeffects"),
+        "prolongedIllness": current_user.get("prolongedillness")
     }
     return JSONResponse(status_code=200, content=data)
 
@@ -72,13 +76,14 @@ async def submit_report(request: Request,
     typ: str = Query(..., description="type of report to change"),
     field: str = Form(...),
     current_user: dict = Depends(role_required("patient"))):
-    if typ.lower() not in ["lifestyleChanges", "otherMedication", "sideEffects", "prolongedIllness"]:
+    print(typ.lower())
+    if typ.lower() not in ["lifestylechanges", "othermedication", "sideeffects", "prolongedillness"]:
         raise HTTPException(status_code=400, detail="Invalid report type")
     
-    result = await patient_collection.update_one({
+    result = await patient_collection.update_one(
         {"ID": current_user["ID"]},
         {"$set": {typ: field }}
-    })
+    )
 
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -95,8 +100,32 @@ async def get_missed_doses(request: Request, current_user: dict = Depends(role_r
     medication_dates = get_medication_dates(therapy_start_date, dosage_schedule)
     missed_doses = find_missed_doses(medication_dates, current_user.get("taken_doses"))
 
-    return JSONResponse(status_code=200, content={"missed_doses": missed_doses})
+    recent_misses_doses = []
+    today = datetime.now()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    for date in missed_doses:
+        date_obj = datetime.strptime(date, "%d-%m-%Y")
+        if start_of_week <= date_obj <= end_of_week:
+            recent_misses_doses.append(date)
+            missed_doses.remove(date)
+    return JSONResponse(status_code=200, content={"recent_misses_doses":recent_misses_doses,"missed_doses": missed_doses})
 
-async def take_dose (date: str, request: Request, current_user: dict = Depends(role_required("patient"))):
-    # TODO : figure out The logic for this function. It is not clear from the original code what it should do.
+async def take_dose (request: Request,date,current_user: dict = Depends(role_required("patient"))):
+    today = datetime.now()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    date_obj = datetime.combine(date, datetime.min.time())
+    if date_obj < start_of_week or date_obj > end_of_week:
+        raise HTTPException(status_code=400, detail="Date is not within the current week")
+    
+    date_str = date_obj.strftime("%Y-%m-%d")
+    result = await patient_collection.update_one(
+        {"ID": current_user["ID"]},
+        {"$push": {"taken_doses": date_str}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Dose already taken for this date")
     return JSONResponse(status_code=200, content={"message": "Dose taken successfully"})

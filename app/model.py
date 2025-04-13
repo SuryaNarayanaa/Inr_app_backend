@@ -10,14 +10,10 @@ class PyObjectId(ObjectId):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v):
+    def validate(cls, v, info):
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
         return ObjectId(v)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, field_schema):
-        field_schema.update(type="string")
 
 class MedicalHistory(BaseModel):
     diagnosis: str
@@ -37,14 +33,16 @@ class PatientCreate(BaseModel):
     contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
     age: int = Field(..., ge=1, le=120)
     gender: str = Field(..., pattern="^(M|F|O)$")
-    caretaker: Optional[str] = None
     type: str = "Patient"
     therapy_start_date : date
+    target_inr_min:float
+    target_inr_max: float
+    therapy: str
     medical_history: Optional[List[MedicalHistory]]
     therapy_start_date: date
     dosage_schedule: Optional[List[DosageSchedule]]
     
-    @field_validator("contact")
+    @field_validator("contact",mode='before')
     @classmethod
     def validate_contact(cls, v):
         if not v.startswith("+91"):
@@ -54,13 +52,19 @@ class PatientCreate(BaseModel):
         return v
     class Config:
         json_encoders = {ObjectId: str}
-        populate_by_name = True  # Allow using `_id` when interacting with MongoDB
+        populate_by_name = True
+    
+    def as_dict(self) -> Dict:
+        dct = self.dict(by_alias=True)
+        dct["therapy_start_date"] = datetime.strftime(dct["therapy_start_date"], "%d/%m/%Y")
+        return dct
 
 class DoctorCreate(BaseModel):
     ID: str = Field(..., pattern=r'^DOC', min_length=4, strip_whitespace=True)  # Enforce DOC prefix
     fullName: str
     contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
     password: str  # Raw password to be hashed
+    occupation:str
     type: str = "Doctor"  # Auto-set for consistency
     refresh_token: Optional[str] = None  # Refresh token for JWT
 
@@ -119,6 +123,7 @@ class Doctor(BaseModel):
     ID: str
     PFP:str
     contact: str = Field(..., pattern=r"^\+91\s?(\d\s?){10}$")
+    occupation:str
     refresh_token: Optional[str] = None  # Refresh token for JWT
 
     class Config:
