@@ -5,21 +5,20 @@ from collections import defaultdict
 
 
 def get_medication_dates(start_date, prescription_list):
-    start_date = datetime.strptime(start_date, "%d/%m/%Y")
+    if(isinstance(start_date, datetime)):
+        start_date = start_date
+    else:
+        start_date = datetime.strptime(start_date, "%d/%m/%Y")
     days_map = {"MON": 0, "TUE": 1, "WED": 2, "THU": 3, "FRI": 4, "SAT": 5, "SUN": 6}
     target_days = set(days_map[p["day"]] for p in prescription_list)
 
     medication_dates = []
     current_date = start_date
     end_date = datetime.now()
-
     while current_date <= end_date:
         if current_date.weekday() in target_days:
             medication_dates.append(current_date.strftime(str("%d-%m-%Y")))
         current_date += timedelta(days=1)
-
-    print(medication_dates)
-
     return medication_dates
 
 def should_take_dose_today(today, medication_dates_set):
@@ -54,7 +53,7 @@ def calculate_monthly_inr_average(inr_reports):
     monthly_counts = defaultdict(int)
 
     if inr_reports == None: inr_reports = [{"date":"1900-01-01T00:00", "inr_value": 0}]
-
+    
     for report in inr_reports:
         if isinstance(report["date"], datetime):
             date = report["date"]

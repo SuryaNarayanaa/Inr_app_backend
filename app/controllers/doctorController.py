@@ -35,8 +35,8 @@ async def doctorhome(request:Request,current_user : dict = Depends(role_required
     for patient in patients:
         if "_id" in patient:
             patient["_id"] = str(patient["_id"])
-    current_user["_id"] = str(current_user["_id"])
-    return JSONResponse(status_code=200, content={"patients":patients,"user":current_user})
+    json_user = jsonable_encoder(current_user,exclude={"passHash","refresh_token","_id"})
+    return JSONResponse(status_code=200, content={"patients":patients,"user":json_user})
 
 
 async def get_doctors():
@@ -123,12 +123,7 @@ async def get_patients(request:Request,current_user:dict = Depends(role_required
         ).to_list(length=None)
     for i in patients2:
         patients.append(i)
-    for patient in patients:
-        if "_id" in patient:
-            patient["_id"] = str(patient["_id"])
-            patient.pop("passHash",None)
-            patient.pop("refresh_token",None)
-    json_ready_patients = jsonable_encoder(patients)
+    json_ready_patients = jsonable_encoder(patients,exclude={"_id","passHash","refresh_token"})
     return JSONResponse(status_code=200, content={"patients":json_ready_patients})
 
 async def view_patient(patient_id:str,request:Request,current_user: dict = Depends(role_required("doctor"))):
@@ -154,14 +149,11 @@ async def view_patient(patient_id:str,request:Request,current_user: dict = Depen
         raise HTTPException(status_code=404, detail="Patient not found")
     if not patient.get("inr_reports"):
         patient["inr_reports"] = [{"date": str("1900-01-01T00:00"), "inr_value": 0}]
-    patient["_id"] = str(patient["_id"])
-    patient = dict(patient)
-    print(patient)
+    json_patient = jsonable_encoder(patient,exclude={"_id","passHash","refresh_token"})
     return JSONResponse(
         status_code=200,
         content={
-            "patient": patient, 
-            "user": current_user,
+            "patient": json_patient, 
             "chart_data": calculate_monthly_inr_average(patient.get("inr_reports")),
             "missed_doses": find_missed_doses(get_medication_dates(patient.get("therapy_start_date"), patient.get("dosage_schedule")),
                                                patient.get("taken_doses"))
