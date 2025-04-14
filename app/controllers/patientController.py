@@ -116,13 +116,14 @@ async def get_missed_doses(request: Request, current_user: dict = Depends(role_r
             missed_doses.remove(date)
     return JSONResponse(status_code=200, content={"recent_missed_doses":recent_missed_doses,"missed_doses": missed_doses})
 
-async def take_dose (request: Request,date,current_user: dict = Depends(role_required("patient"))):
+async def take_dose (request: Request,date:str,current_user: dict = Depends(role_required("patient"))):
     today = datetime.now()
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
+    seven_days_ago = today - timedelta(days=7)
     date_obj = datetime.combine(date, datetime.min.time())
-    if date_obj < start_of_week or date_obj > end_of_week:
-        raise HTTPException(status_code=400, detail="Date is not within the current week")
+    if not (seven_days_ago <= date_obj <= today):
+        raise HTTPException(status_code=400, detail="Date is not within the last 7 days")
+    if date_obj.strftime("%Y-%m-%d") in current_user["taken_doses"]:
+        raise HTTPException(status_code=400, detail="Dose already taken for this date")
     
     date_str = date_obj.strftime("%Y-%m-%d")
     result = await patient_collection.update_one(
