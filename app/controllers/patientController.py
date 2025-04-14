@@ -38,17 +38,18 @@ async def patient_home(request: Request, current_user: dict = Depends(role_requi
 
 async def update_inr_report(request:Request,
         inr_value: float = Form(...),location_of_test: str = Form(...),
-        date: str = Form(...),file:UploadFile = File(...),
+        date: str = Form(...),file:str = Form(...),
+        file_name:str = Form(...),
         current_user: dict = Depends(role_required("patient"))):
-    file_path = f"static/patient_docs/{file.filename}"
+    file_path = f"static/patient_docs/{file_name}"
     with open(file_path, "wb") as f:
-        f.write(await file.read())
+        f.write(file)
     
     report_dict:INRReport = {
         "inr_value": inr_value,
         "location_of_test": location_of_test,
         "date": date,
-        "file_name": file.filename,
+        "file_name": file_name,
         "file_path": file_path,
         "type": "INR Report",
     }

@@ -21,10 +21,11 @@ async def update_inr(request: Request,
     inr_value: float = Form(...),
     location_of_test: str = Form(...),
     date: str = Form(...),
-    file: UploadFile = File(...),
+    file: str = Form(...),
+    file_name:str = Form(...),
     current_user: dict = Depends(role_required("patient"))):
     try:
-        return await update_inr_report(request,inr_value,location_of_test,date,file,current_user)
+        return await update_inr_report(request,inr_value,location_of_test,date,file,file_name,current_user)
     except HTTPException as http_exc:
         return JSONResponse(status_code=http_exc.status_code, content={"error": http_exc.detail})
     except Exception as e:
