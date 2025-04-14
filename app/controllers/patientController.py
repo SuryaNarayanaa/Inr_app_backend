@@ -106,16 +106,15 @@ async def get_missed_doses(request: Request, current_user: dict = Depends(role_r
     medication_dates = get_medication_dates(therapy_start_date, dosage_schedule)
     missed_doses = find_missed_doses(medication_dates, current_user.get("taken_doses"))
 
-    recent_misses_doses = []
+    recent_missed_doses = []
     today = datetime.now()
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
+    seven_days_ago = today - timedelta(days=7)
     for date in missed_doses:
         date_obj = datetime.strptime(date, "%d-%m-%Y")
-        if start_of_week <= date_obj <= end_of_week:
-            recent_misses_doses.append(date)
+        if seven_days_ago <= date_obj <= today:
+            recent_missed_doses.append(date)
             missed_doses.remove(date)
-    return JSONResponse(status_code=200, content={"recent_misses_doses":recent_misses_doses,"missed_doses": missed_doses})
+    return JSONResponse(status_code=200, content={"recent_missed_doses":recent_missed_doses,"missed_doses": missed_doses})
 
 async def take_dose (request: Request,date,current_user: dict = Depends(role_required("patient"))):
     today = datetime.now()
