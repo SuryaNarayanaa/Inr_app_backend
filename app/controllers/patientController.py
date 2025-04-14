@@ -7,6 +7,7 @@ from app.utils.patientUtils import calculate_monthly_inr_average, get_medication
 from app.database import patient_collection,doctor_collection
 import os
 from datetime import datetime, timedelta,date
+import base64
 
 
 async def patient_home(request: Request, current_user: dict = Depends(role_required("patient"))):
@@ -42,8 +43,12 @@ async def update_inr_report(request:Request,
         file_name:str = Form(...),
         current_user: dict = Depends(role_required("patient"))):
     file_path = f"static/patient_docs/{file_name}"
+    missing_padding = len(file) % 4
+    if missing_padding:
+        file += '=' * (4 - missing_padding)
+    file_bytes = base64.b64decode(file)
     with open(file_path, "wb") as f:
-        f.write(file)
+        f.write(file_bytes)
     
     report_dict:INRReport = {
         "inr_value": inr_value,
