@@ -168,34 +168,44 @@ async def edit_dosage(patient_id:str,dosage:editDosageSchema,request: Request, c
     patient_collection.update_one({"ID": patient_id}, {"$set": {"dosage_schedule": dosage_list}})
     return JSONResponse(status_code=200,content={"message": "Dosage edited successfully"})
 
-async def view_reports(typ:str,request:Request,current_user: dict = Depends(role_required("doctor"))):
+async def view_reports(request: Request, typ: str, current_user: dict = Depends(role_required("doctor"))):
+    report_data = []
+    
     if typ == "today":
-        patients = patient_collection.find({"doctor": current_user["ID"]})
-        report_data = []
-        for patient in patients:
-            for report in patient["inr_reports",[]]:
-                if report["data"].startswith(datetime.now(pytz.timezone("Asia/Kolkata")).strftime("%Y-%m-%d")):
+        patients_cursor = patient_collection.find({"doctor": current_user["ID"]})
+        async for patient in patients_cursor:
+            for report in patient.get("inr_reports", []):
+                if report.get("date", "").startswith(datetime.now(pytz.timezone("Asia/Kolkata")).strftime("%Y-%m-%d")):
                     report_data.append({
+                        "patient_ID":patient.get("ID"),
                         "patient_name": patient.get("name"),
                         "inr_report": report,
                     })
-        return JSONResponse(status_code=200,content={"reports": report_data}) 
+        return JSONResponse(status_code=200, content={"reports": report_data})
+
     elif typ == "all":
-        patients = patient_collection.find({"doctor": current_user["ID"]})
-        report_data = []
-        for patient in patients:
-            for report in patient["inr_reports",[]]:
+        patients_cursor = patient_collection.find({"doctor": current_user["ID"]})
+        async for patient in patients_cursor:
+            for report in patient.get("inr_reports", []):
                 report_data.append({
+                    "patient_ID":patient.get("ID"),
                     "patient_name": patient.get("name"),
                     "inr_report": report,
                 })
-        return JSONResponse(status_code=200,content={"reports": report_data})
+        return JSONResponse(status_code=200, content={"reports": report_data})
+
     else:
-        patient = patient_collection.find_one({"ID":typ,"doctor": current_user["ID"]})
+        patient = await patient_collection.find_one({"ID": typ, "doctor": current_user["ID"]})
         if not patient:
             raise HTTPException(status_code=404, detail="Patient not found")
-        reports = [{"patient_name": patient.get("name"), "inr_report": report} for report in patient["inr_reports"]]
-        return JSONResponse(status_code=200,content={"reports": reports})
+
+        for report in patient.get("inr_reports", []):
+            report_data.append({
+                "patient_ID":patient.get("ID"),
+                "patient_name": patient.get("name"),
+                "inr_report": report,
+            })
+        return JSONResponse(status_code=200, content={"reports": report_data})
 
 async def download_patient_report(patient_id:str,request:Request,current_user: dict = Depends(role_required("doctor"))):
     patient = await patient_collection.find_one({"ID":patient_id,"doctor": current_user["ID"]})
@@ -227,24 +237,3 @@ async def download_patient_report(patient_id:str,request:Request,current_user: d
     )
 
 
-async def get_patient_reports(request: Request, current_user: dict = Depends(role_required("doctor"))):
-    # Convert both cursors to lists
-    patients_cursor_1 = patient_collection.find({"doctor": current_user["ID"], "caretaker": {"$exists": False}})
-    patients_cursor_2 = patient_collection.find({"caretaker": current_user["ID"]})
-    
-    patients1 = await patients_cursor_1.to_list(length=None)
-    patients2 = await patients_cursor_2.to_list(length=None)
-
-    all_patients = patients1 + patients2
-
-    result = []
-    for patient in all_patients:
-        patient_data = {
-            "ID": patient["ID"],
-            "patient_name": patient["name"],
-            "inr_reports": patient.get("inr_reports", [])
-        }
-        result.append(patient_data)
-
-    json_result = jsonable_encoder(result)
-    return JSONResponse(status_code=200, content={"patients": json_result})
