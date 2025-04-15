@@ -14,7 +14,7 @@ import hashlib
 
 async def doctorhome(request:Request,current_user : dict = Depends(role_required("doctor"))):
     pipeline = [
-    {"$match": {"doctor": current_user["ID"]}},
+    {"$match": {"caretaker": current_user["ID"]}},
     {"$lookup": {
         "from": "doctor",
         "localField": "caretaker",
