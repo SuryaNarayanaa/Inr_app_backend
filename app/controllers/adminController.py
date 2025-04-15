@@ -6,6 +6,7 @@ from app.model import PatientCreate, DoctorCreate
 import hashlib
 import re
 from typing import Union
+from fastapi.encoders import jsonable_encoder
 
 async def getadmindetails(request: Request, current_user: dict = Depends(role_required("admin"))):
     patients_cursor = patient_collection.find()
@@ -39,9 +40,11 @@ async def getadmindetails(request: Request, current_user: dict = Depends(role_re
 
     sorted_columns = name_columns + id_columns + type_columns + role_columns + contact_columns + other_columns
 
+    json_all_users = jsonable_encoder(all_users,exclude={"_id","passHash","refresh_token"})
+
     return JSONResponse(
         status_code=200,
-        content={"items": all_users, "columns": sorted_columns}
+        content={"items": json_all_users, "columns": sorted_columns}
     )
 
 

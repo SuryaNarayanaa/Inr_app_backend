@@ -14,20 +14,20 @@ import hashlib
 
 async def doctorhome(request:Request,current_user : dict = Depends(role_required("doctor"))):
     pipeline = [
-        {"$match": {"doctor": current_user["ID"]}},
-        {"$lookup": {
-            "from": "doctor",
-            "localField": "caretaker",
-            "foreignField": "ID",
-            "as": "caretaker_info"
-        }},
-        {"$unwind": "$caretaker_info"},
-        {"$addFields": {"caretakerName": "$caretaker_info.fullName"}},
-        {"$project": {"caretakerName": 1, "name": 1, "doctor": 1, "ID": 1, "age": 1, "gender": 1}}
+    {"$match": {"doctor": current_user["ID"]}},
+    {"$lookup": {
+        "from": "doctor",
+        "localField": "caretaker",
+        "foreignField": "ID",
+        "as": "caretaker_info"
+    }},
+    {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},
+    {"$addFields": {"caretakerName": "$caretaker_info.fullName"}},
+    {"$project": {"caretakerName": 1, "name": 1, "doctor": 1, "ID": 1, "age": 1, "gender": 1}}
     ]
     patients = await patient_collection.aggregate(pipeline).to_list(length=None)
     patients2 = await patient_collection.find(
-        {"doctor": current_user["ID"], "caretaker": {"$exists": False}},
+        {"doctor": current_user["ID"]},
         {"name": 1, "gender": 1, "doctor": 1, "ID": 1, "age": 1}
     ).to_list(length=None)
     for i in patients2:

@@ -13,7 +13,8 @@ from app.controllers.doctorController import (
     download_patient_report,
 )
 from app.utils.authutils import get_current_user, role_required
-from app.model import PatientCreate
+from app.model import PatientCreate, DosageSchedule
+from typing import List
 
 doctor_router = APIRouter()
 
@@ -78,7 +79,7 @@ async def fetch_patient(patient_id: str, request: Request, current_user: dict = 
 
 @doctor_router.put("/edit-dosage/{patient_id}",response_class=JSONResponse, dependencies=[Depends(get_current_user)])
 async def edit_dosage_route(
-    patient_id: str, dosage: list, request: Request, current_user: dict = Depends(role_required("doctor"))
+    patient_id: str, dosage: List[DosageSchedule], request: Request, current_user: dict = Depends(role_required("doctor"))
 ):
     try:
         return await edit_dosage(patient_id, dosage, request, current_user)
