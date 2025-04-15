@@ -25,10 +25,14 @@ def should_take_dose_today(today, medication_dates_set):
     return today in medication_dates_set
 
 def find_missed_doses(medication_dates_set, taken_dates_set):
-    if taken_dates_set:
-        return sorted(set(medication_dates_set) - set(taken_dates_set))
-    else:
-        return sorted(medication_dates_set)
+    taken_dates_formatted = set(
+        datetime.strptime(date, "%Y-%m-%d").strftime("%d-%m-%Y")
+        for date in taken_dates_set
+    ) if taken_dates_set else set()
+
+    # Compute the missed doses
+    missed_doses = sorted(set(medication_dates_set) - taken_dates_formatted)
+    return missed_doses
     
 def parse_report_date(date_input):
     if isinstance(date_input, datetime):

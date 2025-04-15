@@ -3,7 +3,8 @@ from fastapi.responses import JSONResponse,FileResponse
 from fastapi.encoders import jsonable_encoder
 from app.utils.authutils import role_required,get_current_user
 from app.database import patient_collection,doctor_collection
-from app.model import Patient,DosageSchedule,PatientCreate
+from app.model import Patient,PatientCreate
+from app.schema.doctorSchema import editDosageSchema
 from app.utils.patientUtils import calculate_monthly_inr_average,find_missed_doses,get_medication_dates
 from typing import List
 from datetime import datetime, date
@@ -106,21 +107,20 @@ async def add_patient(patient_data:PatientCreate,request:Request,current_user:di
 
 async def get_patients(request:Request,current_user:dict = Depends(role_required("doctor"))):
     pipeline = [
-        {"$match": {"doctor": current_user["ID"]}},
+        {"$match": {"caretaker": current_user["ID"]}},
         {"$lookup": {
             "from": "doctor",
             "localField": "caretaker",
             "foreignField": "ID",
             "as": "caretaker_info"
         }},
-        {"$unwind": "$caretaker_info"},
+        {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},
         {"$addFields": {"caretakerName": "$caretaker_info.fullName"}}
     ]
     patients = await patient_collection.aggregate(pipeline).to_list(length=None)
-    if len(patients) == 0:
-        patients2 = await patient_collection.find(
-            {"doctor": current_user["ID"], "caretaker": {"$exists": False}}
-        ).to_list(length=None)
+    patients2 = await patient_collection.find(
+        {"doctor": current_user["ID"], "caretaker": {"$exists": False}}
+    ).to_list(length=None)
     for i in patients2:
         patients.append(i)
     json_ready_patients = jsonable_encoder(patients,exclude={"_id","passHash","refresh_token"})
@@ -128,14 +128,14 @@ async def get_patients(request:Request,current_user:dict = Depends(role_required
 
 async def view_patient(patient_id:str,request:Request,current_user: dict = Depends(role_required("doctor"))):
     pipeline = [
-        {"$match": {"ID":patient_id,"doctor": current_user["ID"]}},
+        {"$match": {"ID":patient_id,"caretaker": current_user["ID"]}},
         {"$lookup": {
             "from": "items",
             "localField": "caretaker",
             "foreignField": "ID",
             "as": "caretaker_info"
         }},
-        {"$unwind": "$caretaker_info"},
+        {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},
         {"$addFields": {"caretakerName": "$caretaker_info.fullName"}}
     ]
     patient = await patient_collection.aggregate(pipeline).to_list(length=None)
@@ -160,8 +160,8 @@ async def view_patient(patient_id:str,request:Request,current_user: dict = Depen
         }) 
     
     
-async def edit_dosage(patient_id:str,dosage:List[DosageSchedule],request: Request, current_user: dict = Depends(role_required("doctor"))):
-    dosage_list = [i.as_dict() for i in dosage]
+async def edit_dosage(patient_id:str,dosage:editDosageSchema,request: Request, current_user: dict = Depends(role_required("doctor"))):
+    dosage_list = [i.as_dict() for i in dosage.dosage_schedule]
     patient = patient_collection.find_one({"ID":patient_id,"doctor": current_user["ID"]})
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -198,26 +198,53 @@ async def view_reports(typ:str,request:Request,current_user: dict = Depends(role
         return JSONResponse(status_code=200,content={"reports": reports})
 
 async def download_patient_report(patient_id:str,request:Request,current_user: dict = Depends(role_required("doctor"))):
-    patient = patient_collection.find_one({"ID":patient_id,"doctor": current_user["ID"]})
+    patient = await patient_collection.find_one({"ID":patient_id,"doctor": current_user["ID"]})
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     if not patient.get("inr_reports"):
         raise HTTPException(status_code=404, detail="No reports found")
     inr_reports = patient.get("inr_reports")
-    file_path = os.path.join("static/patient_docs", inr_reports.filename)
+    if not inr_reports:
+        raise HTTPException(status_code=404,detail="No inr_report is submitted by the patient")
+    lastest_inr_report = inr_reports[-1]
+    print(lastest_inr_report.get('file_name'))
+    file_path = os.path.join("static/patient_docs", lastest_inr_report.get('file_name'))
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
-    if inr_reports.filename.endswith(".pdf"):
+    if lastest_inr_report.get('file_name').endswith(".pdf"):
         media_type = "application/pdf"
-    elif inr_reports.filename.endswith(".docx"):
+    elif lastest_inr_report.get('file_name').endswith(".docx"):
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     else:
         raise HTTPException(status_code=415, detail="Unsupported file format")
 
     return FileResponse(
         path=file_path,
-        filename=inr_reports.filename,  
-        media_type=media_type    
+        filename=lastest_inr_report.get('file_name'),  
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={lastest_inr_report.get('file_name')}"}    
     )
 
+
+async def get_patient_reports(request: Request, current_user: dict = Depends(role_required("doctor"))):
+    # Convert both cursors to lists
+    patients_cursor_1 = patient_collection.find({"doctor": current_user["ID"], "caretaker": {"$exists": False}})
+    patients_cursor_2 = patient_collection.find({"caretaker": current_user["ID"]})
+    
+    patients1 = await patients_cursor_1.to_list(length=None)
+    patients2 = await patients_cursor_2.to_list(length=None)
+
+    all_patients = patients1 + patients2
+
+    result = []
+    for patient in all_patients:
+        patient_data = {
+            "ID": patient["ID"],
+            "patient_name": patient["name"],
+            "inr_reports": patient.get("inr_reports", [])
+        }
+        result.append(patient_data)
+
+    json_result = jsonable_encoder(result)
+    return JSONResponse(status_code=200, content={"patients": json_result})

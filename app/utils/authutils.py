@@ -8,7 +8,7 @@ from app.database import patient_collection,doctor_collection
 
 SECRET_KEY = "your-secret-key-here"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 600
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")

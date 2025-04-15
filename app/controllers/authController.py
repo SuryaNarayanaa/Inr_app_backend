@@ -58,7 +58,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
                     "as": "caretaker_info"
                 }
             },
-            {"$unwind": "$caretaker_info"},  
+            {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},  
             {"$addFields": {"caretakerName": "$caretaker_info.fullName"}}
         ]
         cursor = patient_collection.aggregate(pipeline)

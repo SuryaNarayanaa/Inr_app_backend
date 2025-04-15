@@ -11,10 +11,11 @@ from app.controllers.doctorController import (
     edit_dosage,
     view_reports,
     download_patient_report,
+    get_patient_reports
 )
 from app.utils.authutils import get_current_user, role_required
-from app.model import PatientCreate, DosageSchedule
-from typing import List
+from app.model import PatientCreate
+from app.schema.doctorSchema import editDosageSchema
 
 doctor_router = APIRouter()
 
@@ -79,7 +80,7 @@ async def fetch_patient(patient_id: str, request: Request, current_user: dict = 
 
 @doctor_router.put("/edit-dosage/{patient_id}",response_class=JSONResponse, dependencies=[Depends(get_current_user)])
 async def edit_dosage_route(
-    patient_id: str, dosage: List[DosageSchedule], request: Request, current_user: dict = Depends(role_required("doctor"))
+    patient_id: str, dosage:editDosageSchema, request: Request, current_user: dict = Depends(role_required("doctor"))
 ):
     try:
         return await edit_dosage(patient_id, dosage, request, current_user)
@@ -101,6 +102,15 @@ async def fetch_reports(typ: str, request: Request, current_user: dict = Depends
 async def download_report(patient_id: str, request: Request, current_user: dict = Depends(role_required("doctor"))):
     try:
         return await download_patient_report(patient_id, request, current_user)
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.detail})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+@doctor_router.get('/patients/report',response_class=JSONResponse,dependencies=[Depends(get_current_user)])
+async def get_reports(request:Request,current_user:dict = Depends(role_required("doctor"))):
+    try:
+        return await get_patient_reports(request, current_user)
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
     except Exception as e:
