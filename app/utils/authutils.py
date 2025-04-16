@@ -20,8 +20,24 @@ def create_access_token(user_data: dict) -> str:
     to_encode.update({"exp": expire, "sub": user_data.get("ID")})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def create_refresh_token() -> str:
-    return secrets.token_urlsafe(64)
+def create_refresh_token(user_data:dict) -> str:
+    expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.utcnow() + expires_delta
+    to_encode = user_data.copy()
+    to_encode.update({"exp": expire, "sub": user_data.get("ID")})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+
+def decode_refresh_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="referesh_token expired")
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     try:

@@ -1,7 +1,7 @@
-from fastapi import Form, HTTPException,Depends
+from fastapi import Form, HTTPException,Depends,Request
 from fastapi.responses import JSONResponse, HTMLResponse
 import hashlib
-from app.utils.authutils import create_access_token,get_current_user, create_refresh_token
+from app.utils.authutils import create_access_token,get_current_user, create_refresh_token,decode_refresh_token
 from app.database import patient_collection, doctor_collection
 from bson import ObjectId
 
@@ -10,7 +10,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
     if username == "admin" and password == "admin123":
         user_data = {"role": "admin", "ID": username}
         access_token = create_access_token(user_data)
-        refresh_token = create_refresh_token()
+        refresh_token = create_refresh_token(user_data)
         return JSONResponse(
             status_code=200,
             content={
@@ -30,7 +30,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
                 user2["_id"] = str(user2["_id"])
             userdata = {"role":"doctor","ID":username}
             access_token = create_access_token(userdata)
-            refresh_token = create_refresh_token()
+            refresh_token = create_refresh_token(userdata)
             await doctor_collection.update_one(
                 {"_id": user["_id"]},
                 {"$set": {"refresh_token": refresh_token}}
@@ -78,7 +78,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
             
             userdata = {"role":"patient","ID":username}
             access_token = create_access_token(userdata)
-            refresh_token = create_refresh_token()
+            refresh_token = create_refresh_token(userdata)
             await patient_collection.update_one(
                 {"_id": user["_id"]},
                 {"$set": {"refresh_token": refresh_token}}
@@ -119,4 +119,46 @@ async def logout(current_user: dict = Depends(get_current_user)):
     return JSONResponse(
         status_code=200,
         content={"message": "logout successful"}
+    )
+
+
+async def refresh_token(request: Request, refresh_token: str):
+    try:
+        payload = decode_refresh_token(refresh_token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid refresh token") from e
+
+    user_id = payload.get("ID")
+    user_role = payload.get("role")
+    if not user_id or not user_role:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    
+    if user_role.lower() == "patient":
+        collection = patient_collection
+    elif user_role.lower() == "doctor":
+        collection = doctor_collection
+    else:
+        raise HTTPException(status_code=401, detail="Unsupported user role")
+
+
+    user = await collection.find_one({"ID": user_id})
+    if not user or user.get("refresh_token") != refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token mismatch or user not found")
+
+    new_access_token = create_access_token({"ID": user_id, "role": user_role})
+    new_refresh_token = create_refresh_token({"ID": user_id, "role": user_role})
+
+    await collection.update_one(
+        {"ID": user_id},
+        {"$set": {"refresh_token": new_refresh_token}}
+    )
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message":"Token refershed successfully",
+            "role":user_role,
+            "access_token": new_access_token,
+            "refresh_token": new_refresh_token
+        }
     )
