@@ -130,7 +130,7 @@ async def view_patient(patient_id:str,request:Request,current_user: dict = Depen
     pipeline = [
         {"$match": {"ID":patient_id,"caretaker": current_user["ID"]}},
         {"$lookup": {
-            "from": "items",
+            "from": "doctor",
             "localField": "caretaker",
             "foreignField": "ID",
             "as": "caretaker_info"

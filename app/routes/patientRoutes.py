@@ -16,7 +16,7 @@ async def get_patients(request: Request,current_user: dict = Depends(role_requir
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-@patient_router.post("/update_inr",response_class=JSONResponse,dependencies=[Depends(get_current_user)])
+@patient_router.post("/update-inr",response_class=JSONResponse,dependencies=[Depends(get_current_user)])
 async def update_inr(request: Request,
     inr_value: float = Form(...),
     location_of_test: str = Form(...),
