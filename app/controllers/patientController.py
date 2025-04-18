@@ -11,8 +11,48 @@ import base64
 
 
 async def patient_home(request: Request, current_user: dict = Depends(role_required("patient"))):
-    pat = current_user
-
+    pipeline = [
+    {
+        "$match": {
+            "ID": current_user["ID"],
+        }
+    },
+    {
+        "$lookup": {
+            "from": "doctors",
+            "localField": "caretaker",
+            "foreignField": "ID",
+            "as": "caretaker_info"
+        }
+    },
+    {
+        "$lookup": {
+            "from": "doctors",
+            "localField": "doctor",
+            "foreignField": "ID",
+            "as": "doctor_info"
+        }
+    },
+    {
+        "$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}
+    },
+    {
+        "$unwind": {"path": "$doctor_info", "preserveNullAndEmptyArrays": True}
+    },
+    {
+        "$addFields": {
+            "caretakerName": "$caretaker_info.fullname",
+            "doctorName": "$doctor_info.fullname"
+        }
+    },
+    {
+            "$unset": ["doctor_info", "caretaker_info"]
+    }
+    ]
+    patient = await patient_collection.aggregate(pipeline).to_list(length=1)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    pat = patient[0];
     if not pat.get("inr_reports"):
         pat["inr_reports"] = [{"date": "1900-01-01T00:00", "inr_value": 0}]
     print(pat.get("inr_reports"))

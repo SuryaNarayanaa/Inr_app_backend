@@ -15,26 +15,42 @@ import hashlib
 
 async def doctorhome(request:Request,current_user : dict = Depends(role_required("doctor"))):
     pipeline = [
-    {"$match": {"caretaker": current_user["ID"]}},
+    {
+        "$match": {
+            "$or": [
+                {"caretaker": current_user["ID"]},
+                {"doctor": current_user["ID"]}
+            ]
+        }
+    },
     {"$lookup": {
-        "from": "doctor",
+        "from": "doctors",
         "localField": "caretaker",
         "foreignField": "ID",
         "as": "caretaker_info"
     }},
+    {
+        "$lookup": {
+            "from": "doctors",
+            "localField": "doctor",
+            "foreignField": "ID",
+            "as": "doctor_info"
+        }
+    },
     {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},
-    {"$addFields": {"caretakerName": "$caretaker_info.fullName"}},
-    {"$project": {"caretakerName": 1, "name": 1, "doctor": 1, "ID": 1, "age": 1, "gender": 1}}
+    {
+        "$unwind": {"path": "$doctor_info", "preserveNullAndEmptyArrays": True}
+    },
+    {
+        "$addFields": {
+            "caretakerName": "$caretaker_info.fullname",
+            "doctorName": "$doctor_info.fullname"
+        }
+    },
+    {"$unset": ["doctor_info", "caretaker_info"]},
+    {"$project": {"caretakerName": 1, "name": 1, "doctor": 1, "ID": 1, "age": 1, "gender": 1,"doctorName":1}}
     ]
     patients = await patient_collection.aggregate(pipeline).to_list(length=None)
-    patients2 = await patient_collection.find(
-        {"doctor": current_user["ID"]},
-        {"name": 1, "gender": 1, "doctor": 1, "ID": 1, "age": 1}
-    ).to_list(length=None)
-    existing_ids = {p["ID"] for p in patients}
-    for i in patients2:
-        if i["ID"] not in existing_ids:
-            patients.append(i)
     for patient in patients:
         if "_id" in patient:
             patient["_id"] = str(patient["_id"])
@@ -111,13 +127,14 @@ async def get_patients(request:Request,current_user:dict = Depends(role_required
     pipeline = [
         {"$match": {"caretaker": current_user["ID"]}},
         {"$lookup": {
-            "from": "doctor",
+            "from": "doctors",
             "localField": "caretaker",
             "foreignField": "ID",
             "as": "caretaker_info"
         }},
         {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},
-        {"$addFields": {"caretakerName": "$caretaker_info.fullName"}}
+        {"$addFields": {"caretakerName": "$caretaker_info.fullName"}},
+        {"$unset": ["caretaker_info"]}
     ]
     patients = await patient_collection.aggregate(pipeline).to_list(length=None)
     patients2 = await patient_collection.find(
