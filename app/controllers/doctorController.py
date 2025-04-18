@@ -28,11 +28,13 @@ async def doctorhome(request:Request,current_user : dict = Depends(role_required
     ]
     patients = await patient_collection.aggregate(pipeline).to_list(length=None)
     patients2 = await patient_collection.find(
-        {"doctor": current_user["ID"],"caretaker": {"$exists": False}},
+        {"doctor": current_user["ID"]},
         {"name": 1, "gender": 1, "doctor": 1, "ID": 1, "age": 1}
     ).to_list(length=None)
+    existing_ids = {p["ID"] for p in patients}
     for i in patients2:
-        patients.append(i)
+        if i["ID"] not in existing_ids:
+            patients.append(i)
     for patient in patients:
         if "_id" in patient:
             patient["_id"] = str(patient["_id"])
