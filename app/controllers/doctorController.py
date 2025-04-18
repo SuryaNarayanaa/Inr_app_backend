@@ -143,7 +143,7 @@ async def view_patient(patient_id:str,request:Request,current_user: dict = Depen
     patient = await patient_collection.aggregate(pipeline).to_list(length=None)
     if len(patient) == 0:
         patient = await patient_collection.find_one(
-            {"ID":patient_id,"doctor": current_user["ID"], "caretaker": {"$exists": False}}
+            {"ID":patient_id,"doctor": current_user["ID"]}
         )
     else:
         patient = patient[0]
@@ -164,7 +164,12 @@ async def view_patient(patient_id:str,request:Request,current_user: dict = Depen
     
 async def edit_dosage(patient_id:str,dosage:editDosageSchema,request: Request, current_user: dict = Depends(role_required("doctor"))):
     dosage_list = [i.as_dict() for i in dosage.dosage_schedule]
-    patient = patient_collection.find_one({"ID":patient_id,"doctor": current_user["ID"]})
+    patient = await patient_collection.find_one({
+            "$or": [
+        {"doctor": current_user["ID"]},
+        {"caretaker": current_user["ID"]}
+        ]
+    })
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     patient_collection.update_one({"ID": patient_id}, {"$set": {"dosage_schedule": dosage_list}})
@@ -174,7 +179,12 @@ async def view_reports(request: Request, typ: str, current_user: dict = Depends(
     report_data = []
     
     if typ == "today":
-        patients_cursor = patient_collection.find({"doctor": current_user["ID"]})
+        patients_cursor = patient_collection.find({
+            "$or": [
+        {"doctor": current_user["ID"]},
+        {"caretaker": current_user["ID"]}
+        ]
+        })
         async for patient in patients_cursor:
             for report in patient.get("inr_reports", []):
                 if report.get("date", "").startswith(datetime.now(pytz.timezone("Asia/Kolkata")).strftime("%Y-%m-%d")):
@@ -186,7 +196,12 @@ async def view_reports(request: Request, typ: str, current_user: dict = Depends(
         return JSONResponse(status_code=200, content={"reports": report_data})
 
     elif typ == "all":
-        patients_cursor = patient_collection.find({"doctor": current_user["ID"]})
+        patients_cursor = patient_collection.find({
+            "$or": [
+        {"doctor": current_user["ID"]},
+        {"caretaker": current_user["ID"]}
+        ]
+        })
         async for patient in patients_cursor:
             for report in patient.get("inr_reports", []):
                 report_data.append({
