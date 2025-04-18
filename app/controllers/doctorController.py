@@ -130,28 +130,59 @@ async def get_patients(request:Request,current_user:dict = Depends(role_required
 
 async def view_patient(patient_id:str,request:Request,current_user: dict = Depends(role_required("doctor"))):
     pipeline = [
-        {"$match": {"ID":patient_id,"caretaker": current_user["ID"]}},
-        {"$lookup": {
-            "from": "doctor",
+    {
+        "$match": {
+            "ID": patient_id,
+            "$or": [
+                {"caretaker": current_user["ID"]},
+                {"doctor": current_user["ID"]}
+            ]
+        }
+    },
+    {
+        "$lookup": {
+            "from": "doctors",
             "localField": "caretaker",
             "foreignField": "ID",
             "as": "caretaker_info"
-        }},
-        {"$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}},
-        {"$addFields": {"caretakerName": "$caretaker_info.fullName"}}
-    ]
-    patient = await patient_collection.aggregate(pipeline).to_list(length=None)
-    if len(patient) == 0:
-        patient = await patient_collection.find_one(
-            {"ID":patient_id,"doctor": current_user["ID"]}
-        )
-    else:
-        patient = patient[0]
+        }
+    },
+    {
+        "$lookup": {
+            "from": "doctors",
+            "localField": "doctor",
+            "foreignField": "ID",
+            "as": "doctor_info"
+        }
+    },
+    {
+        "$unwind": {"path": "$caretaker_info", "preserveNullAndEmptyArrays": True}
+    },
+    {
+        "$unwind": {"path": "$doctor_info", "preserveNullAndEmptyArrays": True}
+    },
+    {
+        "$addFields": {
+            "caretakerName": "$caretaker_info.fullname",
+            "doctorName": "$doctor_info.fullname"
+        }
+    },
+    {
+            "$unset": ["doctor_info", "caretaker_info"]
+}
+
+]
+    patient = await patient_collection.aggregate(pipeline).to_list(length=1)
+    print(patient)
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+       raise HTTPException(status_code=404, detail="Patient not found")
+    patient = patient[0]
+    patient.pop("_id", None)
     if not patient.get("inr_reports"):
         patient["inr_reports"] = [{"date": str("1900-01-01T00:00"), "inr_value": 0}]
-    json_patient = jsonable_encoder(patient,exclude={"_id","passHash","refresh_token"})
+    print(patient.get('caretakerName'),"  ",patient.get('doctorName'))
+
+    json_patient = jsonable_encoder(patient,exclude={"_id","","passHash","refresh_token"})
     return JSONResponse(
         status_code=200,
         content={
