@@ -21,8 +21,8 @@ async def update_inr(request: Request,
     inr_value: float = Form(...),
     location_of_test: str = Form(...),
     date: str = Form(...),
-    file: str = Form(...),
-    file_name:str = Form(...),
+    file: str = Form(None),
+    file_name:str = Form(None),
     current_user: dict = Depends(role_required("patient"))):
     try:
         return await update_inr_report(request,inr_value,location_of_test,date,file,file_name,current_user)

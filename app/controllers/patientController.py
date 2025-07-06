@@ -79,16 +79,18 @@ async def patient_home(request: Request, current_user: dict = Depends(role_requi
 
 async def update_inr_report(request:Request,
         inr_value: float = Form(...),location_of_test: str = Form(...),
-        date: str = Form(...),file:str = Form(...),
-        file_name:str = Form(...),
+        date: str = Form(...),file:str = Form(None),
+        file_name:str = Form(None),
         current_user: dict = Depends(role_required("patient"))):
-    file_path = f"static/patient_docs/{file_name}"
-    missing_padding = len(file) % 4
-    if missing_padding:
-        file += '=' * (4 - missing_padding)
-    file_bytes = base64.b64decode(file)
-    with open(file_path, "wb") as f:
-        f.write(file_bytes)
+    file_path = None
+    if file and file_name:
+        file_path = f"static/patient_docs/{file_name}"
+        missing_padding = len(file) % 4
+        if missing_padding:
+            file += '=' * (4 - missing_padding)
+        file_bytes = base64.b64decode(file)
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
     
     report_dict:INRReport = {
         "inr_value": inr_value,
