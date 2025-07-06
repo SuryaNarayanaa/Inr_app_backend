@@ -59,6 +59,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 def role_required(role: str):
     def dependency(current_user:dict = Depends(get_current_user)):
         if role != "*" and current_user.get("role") != role:
-            raise HTTPException(status_code=403, detail="Unauthorized access")
+            raise HTTPException(status_code=402, detail="Unauthorized access")
         return current_user
     return dependency
