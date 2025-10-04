@@ -71,7 +71,8 @@ async def login(username: str = Form(...), password: str = Form(...)):
             })
         else:
             user = patient[0]
-        if user and password == user["contact"].replace(" ", "").replace("+91", ""):
+        # Compare the SHA-512 hash of the provided password with stored passHash
+        if user and hashlib.sha512(password.encode('utf-8')).hexdigest() == user.get("passHash"):
             user2 = user.copy()
             if "_id" in user2:
                 user2["_id"] = str(user2["_id"])
@@ -83,13 +84,13 @@ async def login(username: str = Form(...), password: str = Form(...)):
                 {"_id": user["_id"]},
                 {"$set": {"refresh_token": refresh_token}}
             )
-                
+            
             return JSONResponse(
                 status_code=200,
                 content={ "message": "login successful","role": "patient",
                         "access_token": access_token,
                         "refresh_token": refresh_token }
-                )
+            )
         else:
             raise HTTPException(status_code=401, detail="Invalid credentials")
     else:
